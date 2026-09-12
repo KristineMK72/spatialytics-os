@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+/* MapLibre GL overrides for dark theme */
+.maplibregl-map {
+  font-family: inherit;
+}
+
+.maplibregl-ctrl-group {
+  background: #0f172a !important;
+  border: 1px solid #1e293b !important;
+}
+
+.maplibregl-ctrl-group button {
+  background-color: #0f172a !important;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid #1e293b !important;
+}
+
+.maplibregl-ctrl-icon {
+  filter: invert(1);
+}
