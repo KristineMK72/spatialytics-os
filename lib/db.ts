@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -25,7 +25,7 @@ function createPool(): Pool {
 export const pool: Pool =
   global.__spatialyticsPool ?? (global.__spatialyticsPool = createPool());
 
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> {
