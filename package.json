@@ -1,12 +1,15 @@
 {
   "name": "spatialytics-os",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml down",
+    "db:reset": "docker compose -f docker/docker-compose.yml down -v && docker compose -f docker/docker-compose.yml up -d"
   },
   "dependencies": {
     "maplibre-gl": "^4.7.1",
@@ -17,6 +20,7 @@
     "stripe": "^16.8.0"
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.14",
     "@types/node": "^20.14.10",
     "@types/pg": "^8.11.6",
     "@types/react": "^18.3.3",

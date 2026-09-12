@@ -1,0 +1,25 @@
+# Spatialytics OS — Local PostGIS stack
+# Usage:  docker compose -f docker/docker-compose.yml up -d
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: spatialytics-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spatialytics
+      POSTGRES_PASSWORD: spatialytics_dev
+      POSTGRES_DB: spatialytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - spatialytics_pgdata:/var/lib/postgresql/data
+      - ../db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spatialytics -d spatialytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  spatialytics_pgdata:
