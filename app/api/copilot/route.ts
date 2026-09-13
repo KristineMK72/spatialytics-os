@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryGeoJSON } from '@/lib/db';
 
-// Demo tenant ID from schema seed
 const DEMO_TENANT = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 
 export async function POST(req: Request) {
@@ -46,7 +45,8 @@ export async function POST(req: Request) {
           [tenantId]
         );
       }
-    } else if (lower.includes('site') || lower.includes('store') || lower.includes('score') || lower.includes('location')) {
+    } else if (lower.includes('competitor') || lower.includes('market') || lower.includes('retail') || lower.includes('commercial')) {
+      // Query competitors table where OSM commercial points live
       geoJson = await queryGeoJSON(
         `
         SELECT json_build_object(
@@ -58,14 +58,14 @@ export async function POST(req: Request) {
               'properties', json_build_object(
                 'id', id,
                 'name', name,
-                'vitality_score', vitality_score,
+                'category', category,
                 'address', address
               )
             )
           ), '[]'::json)
         ) AS geojson
-        FROM stores
-        WHERE tenant_id = $1 AND is_active = TRUE
+        FROM competitors
+        WHERE tenant_id = $1 OR tenant_id = '4b22a069-7535-4e05-aa8c-2e2989704652'
         `,
         [tenantId]
       );
@@ -86,11 +86,12 @@ export async function POST(req: Request) {
           ), '[]'::json)
         ) AS geojson
         FROM trade_areas
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1 OR tenant_id = '4b22a069-7535-4e05-aa8c-2e2989704652'
         `,
         [tenantId]
       );
     } else {
+      // Default: Pull all active stores across both tenants
       geoJson = await queryGeoJSON(
         `
         SELECT json_build_object(
@@ -100,14 +101,17 @@ export async function POST(req: Request) {
               'type', 'Feature',
               'geometry', ST_AsGeoJSON(geom)::json,
               'properties', json_build_object(
+                'id', id,
                 'name', name,
-                'vitality_score', vitality_score
+                'vitality_score', vitality_score,
+                'address', address
               )
             )
           ), '[]'::json)
         ) AS geojson
         FROM stores
-        WHERE tenant_id = $1
+        WHERE (tenant_id = $1 OR tenant_id = '4b22a069-7535-4e05-aa8c-2e2989704652')
+          AND is_active = TRUE
         `,
         [tenantId]
       );
