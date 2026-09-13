@@ -25,21 +25,24 @@ export default function DashboardPage() {
       const data = await res.json();
       if (data.success && data.geoJson) {
         setSpatialData(data.geoJson);
-        setLastResponse(`Returned ${data.geoJson.features?.length ?? 0} features.`);
+        const count = data.geoJson.features?.length ?? 0;
+        const layer = data.meta?.layer || 'features';
+        setLastResponse(`Returned ${count} ${layer}.`);
       } else {
         setLastResponse(data.error || 'No results');
       }
     } catch (err) {
       console.error('Failed to execute spatial query', err);
-      setLastResponse('Request failed — is the database running?');
+      setLastResponse('Request failed — check DATABASE_URL');
     } finally {
       setLoading(false);
     }
   };
 
   const examplePrompts = [
-    'Show me high-value customer clusters',
     'Map all store locations and scores',
+    'Show me high-value customer clusters',
+    'Show competitors',
     'Display trade areas',
   ];
 
@@ -53,7 +56,7 @@ export default function DashboardPage() {
             <p className="text-[11px] text-slate-500 mt-0.5">Command Center</p>
           </div>
           <span className="text-xs px-2 py-1 rounded bg-sky-950 text-sky-300 border border-sky-800">
-            v0.2
+            v0.3
           </span>
         </div>
 
@@ -61,8 +64,7 @@ export default function DashboardPage() {
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm">
             <p className="text-slate-300">
-              👋 Welcome. Ask in plain English to analyze locations, cluster customers,
-              or score trade areas. Results appear on the map.
+              👋 Connected to Neon. Ask for stores, customers, competitors, or trade areas.
             </p>
           </div>
 
@@ -93,7 +95,7 @@ export default function DashboardPage() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g., Show me high-value customer clusters..."
+              placeholder="e.g., Map all store locations and scores"
               className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 resize-none h-24"
               disabled={loading}
             />
