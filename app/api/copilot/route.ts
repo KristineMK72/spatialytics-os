@@ -1,15 +1,11 @@
-// pages/api/copilot.ts (or app/api/copilot/route.ts for Next 13+)
-
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-type LayerName = 'stores' | 'competitors' | 'trade_areas' | 'customers';
-
-async function queryGeoJSON(sql: string): Promise<any> {
+async function queryGeoJSON(sql: string) {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(sql);
@@ -60,8 +56,22 @@ async function fetchCompetitors() {
         )
       ), '[]'::json)
     ) AS geojson
-    FROM competitors
-    WHERE geom IS NOT NULL;
+    FROM stores
+    WHERE geom IS NOT NULL
+      AND (
+        category IS NOT NULL OR
+        name ILIKE '%subway%' OR
+        name ILIKE '%dollar%' OR
+        name ILIKE '%bp%' OR
+        name ILIKE '%walgreens%' OR
+        name ILIKE '%hardware%' OR
+        name ILIKE '%pizza%' OR
+        name ILIKE '%brew%' OR
+        name ILIKE '%fuel%' OR
+        name ILIKE '%gas%' OR
+        name ILIKE '%cafe%' OR
+        name ILIKE '%coffee%'
+      );
   `);
 }
 
@@ -108,7 +118,7 @@ async function fetchCustomers() {
   `);
 }
 
-function inferLayer(prompt: string): LayerName {
+function inferLayer(prompt: string) {
   const p = prompt.toLowerCase();
 
   if (p.includes('customer') || p.includes('cluster') || p.includes('value')) {
@@ -117,27 +127,17 @@ function inferLayer(prompt: string): LayerName {
   if (p.includes('competitor') || p.includes('rival') || p.includes('competition')) {
     return 'competitors';
   }
-  if (
-    p.includes('trade area') ||
-    p.includes('trade_area') ||
-    p.includes('catchment') ||
-    p.includes('polygon')
-  ) {
+  if (p.includes('trade area') || p.includes('catchment') || p.includes('polygon')) {
     return 'trade_areas';
   }
   return 'stores';
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
+export async function POST(req: NextRequest) {
   try {
-    const { prompt } = req.body as { prompt: string };
-
+    const { prompt } = await req.json();
     const layer = inferLayer(prompt ?? '');
+
     let geojson;
 
     switch (layer) {
@@ -150,18 +150,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'customers':
         geojson = await fetchCustomers();
         break;
-      case 'stores':
       default:
         geojson = await fetchStores();
         break;
     }
 
-    res.status(200).json({
-      layer,
-      geojson,
-    });
-  } catch (err: any) {
+    return NextResponse.json({ layer, geojson });
+  } catch (err) {
     console.error('Copilot route error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
