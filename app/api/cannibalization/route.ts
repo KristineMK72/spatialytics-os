@@ -117,7 +117,7 @@ export async function POST(req: Request) {
         existing_geom: row.existing_geom,
         existing_trade_polygon: row.existing_trade_polygon,
         overlap_percentage: safeNumber(row.overlap_percentage),
-        distance_miles: safeNumber(row.distance_miles, null),
+        distance_miles: safeNumber(row.distance_miles),
       }));
 
       const maxOverlap = Math.max(
