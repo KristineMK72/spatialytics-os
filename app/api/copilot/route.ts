@@ -7,8 +7,9 @@ import { queryGeoJSON, query } from '@/lib/db';
 // ──────────────────────────────────────────────────────────────
 //
 
-const PILOT_TENANT = '4b22a069-7535-4e05-aa8c-2e2989704652';
-const DEMO_TENANT  = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+const PILOT_TENANT = '34968a05-16de-4779-bcb6-462bdc09cb7a';
+const DEMO_TENANT  = '34968a05-16de-4779-bcb6-462bdc09cb7a'; 
+
 
 type LayerName = 'stores' | 'customers' | 'competitors' | 'trade_areas';
 
