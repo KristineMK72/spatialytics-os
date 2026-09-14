@@ -16,16 +16,26 @@ export default function DashboardPage() {
 
     setLoading(true);
     setLastResponse(null);
+
     try {
       const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       });
+
       const data = await res.json();
-      if (data.success && data.geoJson) {
-        setSpatialData(data.geoJson);
-        const count = data.geoJson.features?.length ?? 0;
+
+      // ✔ FIXED: Your API returns { type, features, meta }
+      if (data.features && Array.isArray(data.features)) {
+        const fc: GeoJSON.FeatureCollection = {
+          type: data.type || 'FeatureCollection',
+          features: data.features,
+        };
+
+        setSpatialData(fc);
+
+        const count = data.features.length ?? 0;
         const layer = data.meta?.layer || 'features';
         setLastResponse(`Returned ${count} ${layer}.`);
       } else {
