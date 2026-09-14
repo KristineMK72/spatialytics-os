@@ -16,34 +16,25 @@ export default function DashboardPage() {
 
     setLoading(true);
     setLastResponse(null);
-
     try {
       const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       });
-
       const data = await res.json();
-
-      // ✔ FIXED: Your API returns { type, features, meta }
-      if (data.features && Array.isArray(data.features)) {
-        const fc: GeoJSON.FeatureCollection = {
-          type: data.type || 'FeatureCollection',
-          features: data.features,
-        };
-
-        setSpatialData(fc);
-
-        const count = data.features.length ?? 0;
+      if (data.success && data.geoJson) {
+        setSpatialData(data.geoJson);
+        const count = data.geoJson.features?.length ?? 0;
         const layer = data.meta?.layer || 'features';
         setLastResponse(`Returned ${count} ${layer}.`);
       } else {
-        setLastResponse(data.error || 'No results');
+        const msg = data.error || data.detail || 'No results';
+        setLastResponse(msg);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to execute spatial query', err);
-      setLastResponse('Request failed — check DATABASE_URL');
+      setLastResponse(err?.message || 'Request failed — check DATABASE_URL');
     } finally {
       setLoading(false);
     }
@@ -58,7 +49,6 @@ export default function DashboardPage() {
 
   return (
     <main className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
-      {/* Sidebar */}
       <aside className="w-96 flex flex-col border-r border-slate-800 bg-slate-900 z-10 shrink-0">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <div>
@@ -70,7 +60,6 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {/* Chat feed */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
           <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm">
             <p className="text-slate-300">
@@ -93,13 +82,12 @@ export default function DashboardPage() {
           </div>
 
           {lastResponse && (
-            <div className="p-3 rounded-lg bg-sky-950/40 border border-sky-800/50 text-sm text-sky-200">
+            <div className="p-3 rounded-lg bg-sky-950/40 border border-sky-800/50 text-sm text-sky-200 break-words">
               {lastResponse}
             </div>
           )}
         </div>
 
-        {/* Prompt form */}
         <form onSubmit={handleCopilotSubmit} className="p-4 border-t border-slate-800 bg-slate-900/80">
           <div className="relative">
             <textarea
@@ -120,7 +108,6 @@ export default function DashboardPage() {
         </form>
       </aside>
 
-      {/* Map workspace */}
       <section className="flex-1 relative h-full min-w-0">
         <MapView geoJsonData={spatialData} />
         <VitalityCard selectedLocation={null} onExportPdf={() => {}} />
