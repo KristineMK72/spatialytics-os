@@ -1,163 +1,118 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { NextResponse } from 'next/server';
+import { queryGeoJSON } from '@/lib/db';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-async function queryGeoJSON(sql: string) {
-  const client = await pool.connect();
+export async function POST(req: Request) {
   try {
-    const { rows } = await client.query(sql);
-    return rows[0]?.geojson ?? { type: 'FeatureCollection', features: [] };
-  } finally {
-    client.release();
-  }
-}
+    const body = await req.json();
+    const prompt: string = (body.prompt || '').toLowerCase();
 
-async function fetchStores() {
-  return queryGeoJSON(`
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object(
-            'id', id,
-            'name', name,
-            'address', address,
-            'vitality_score', vitality_score,
-            'tenant_id', tenant_id
-          )
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM stores
-    WHERE geom IS NOT NULL;
-  `);
-}
-
-async function fetchCompetitors() {
-  return queryGeoJSON(`
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object(
-            'id', id,
-            'name', name,
-            'address', address,
-            'category', category,
-            'tenant_id', tenant_id
-          )
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM stores
-    WHERE geom IS NOT NULL
-      AND (
-        category IS NOT NULL OR
-        name ILIKE '%subway%' OR
-        name ILIKE '%dollar%' OR
-        name ILIKE '%bp%' OR
-        name ILIKE '%walgreens%' OR
-        name ILIKE '%hardware%' OR
-        name ILIKE '%pizza%' OR
-        name ILIKE '%brew%' OR
-        name ILIKE '%fuel%' OR
-        name ILIKE '%gas%' OR
-        name ILIKE '%cafe%' OR
-        name ILIKE '%coffee%'
-      );
-  `);
-}
-
-async function fetchTradeAreas() {
-  return queryGeoJSON(`
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object(
-            'id', id,
-            'name', name,
-            'tenant_id', tenant_id
-          )
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM trade_areas
-    WHERE geom IS NOT NULL;
-  `);
-}
-
-async function fetchCustomers() {
-  return queryGeoJSON(`
-    SELECT json_build_object(
-      'type', 'FeatureCollection',
-      'features', COALESCE(json_agg(
-        json_build_object(
-          'type', 'Feature',
-          'geometry', ST_AsGeoJSON(geom)::json,
-          'properties', json_build_object(
-            'id', id,
-            'segment', segment,
-            'lifetime_value', lifetime_value,
-            'tenant_id', tenant_id
-          )
-        )
-      ), '[]'::json)
-    ) AS geojson
-    FROM customers
-    WHERE geom IS NOT NULL;
-  `);
-}
-
-function inferLayer(prompt: string) {
-  const p = prompt.toLowerCase();
-
-  if (p.includes('customer') || p.includes('cluster') || p.includes('value')) {
-    return 'customers';
-  }
-  if (p.includes('competitor') || p.includes('rival') || p.includes('competition')) {
-    return 'competitors';
-  }
-  if (p.includes('trade area') || p.includes('catchment') || p.includes('polygon')) {
-    return 'trade_areas';
-  }
-  return 'stores';
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const { prompt } = await req.json();
-    const layer = inferLayer(prompt ?? '');
-
-    let geojson;
-
-    switch (layer) {
-      case 'competitors':
-        geojson = await fetchCompetitors();
-        break;
-      case 'trade_areas':
-        geojson = await fetchTradeAreas();
-        break;
-      case 'customers':
-        geojson = await fetchCustomers();
-        break;
-      default:
-        geojson = await fetchStores();
-        break;
+    if (!prompt) {
+      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    return NextResponse.json({ layer, geojson });
-  } catch (err) {
-    console.error('Copilot route error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    let geoJson: GeoJSON.FeatureCollection;
+    let layer = 'stores';
+
+    if (prompt.includes('customer') || prompt.includes('cluster') || prompt.includes('value')) {
+      layer = 'customers';
+      geoJson = await queryGeoJSON(`
+        SELECT json_build_object(
+          'type', 'FeatureCollection',
+          'features', COALESCE(json_agg(
+            json_build_object(
+              'type', 'Feature',
+              'geometry', ST_AsGeoJSON(geom)::json,
+              'properties', json_build_object(
+                'id', id,
+                'name', customer_name,
+                'ltv', lifetime_value,
+                'tier', tier
+              )
+            )
+          ), '[]'::json)
+        ) AS geojson
+        FROM customers
+        WHERE geom IS NOT NULL
+      `);
+    } else if (prompt.includes('competitor') || prompt.includes('rival') || prompt.includes('competition')) {
+      layer = 'competitors';
+      geoJson = await queryGeoJSON(`
+        SELECT json_build_object(
+          'type', 'FeatureCollection',
+          'features', COALESCE(json_agg(
+            json_build_object(
+              'type', 'Feature',
+              'geometry', ST_AsGeoJSON(geom)::json,
+              'properties', json_build_object(
+                'id', id,
+                'name', name,
+                'category', category,
+                'address', address
+              )
+            )
+          ), '[]'::json)
+        ) AS geojson
+        FROM competitors
+        WHERE geom IS NOT NULL
+        LIMIT 2000
+      `);
+    } else if (prompt.includes('trade') || prompt.includes('area') || prompt.includes('catchment') || prompt.includes('polygon')) {
+      layer = 'trade_areas';
+      geoJson = await queryGeoJSON(`
+        SELECT json_build_object(
+          'type', 'FeatureCollection',
+          'features', COALESCE(json_agg(
+            json_build_object(
+              'type', 'Feature',
+              'geometry', ST_AsGeoJSON(geom)::json,
+              'properties', json_build_object(
+                'id', id,
+                'zone_name', COALESCE(zone_name, 'Trade Area'),
+                'type', 'trade_area'
+              )
+            )
+          ), '[]'::json)
+        ) AS geojson
+        FROM trade_areas
+        WHERE geom IS NOT NULL
+        LIMIT 1500
+      `);
+    } else {
+      // stores (default) — pull everything
+      layer = 'stores';
+      geoJson = await queryGeoJSON(`
+        SELECT json_build_object(
+          'type', 'FeatureCollection',
+          'features', COALESCE(json_agg(
+            json_build_object(
+              'type', 'Feature',
+              'geometry', ST_AsGeoJSON(geom)::json,
+              'properties', json_build_object(
+                'id', id,
+                'name', name,
+                'vitality_score', vitality_score,
+                'address', address
+              )
+            )
+          ), '[]'::json)
+        ) AS geojson
+        FROM stores
+        WHERE geom IS NOT NULL
+      `);
+    }
+
+    const count = geoJson?.features?.length ?? 0;
+
+    return NextResponse.json({
+      success: true,
+      geoJson,
+      meta: { layer, featureCount: count },
+    });
+  } catch (error: any) {
+    console.error('Spatial Copilot Error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Database error' },
+      { status: 500 }
+    );
   }
 }
